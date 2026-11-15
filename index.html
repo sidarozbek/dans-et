@@ -92,6 +92,12 @@
   #paused{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45)}
   #paused.on{display:flex}
   #paused div{padding:2cqh 3cqw;font-size:3.4cqh;transform:rotate(-1deg)}
+  #inter{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.72)}
+  #inter.on{display:flex}
+  #inter > div{padding:4cqh 5cqw;text-align:center;transform:rotate(-1deg);box-shadow:0 1cqh 3cqh rgba(0,0,0,.5)}
+  #inter .n{font-family:var(--fellsc);color:var(--madder);font-size:3.4cqh}
+  #inter .t{font-size:7cqh;line-height:1;margin:.8cqh 0}
+  #inter .w{font-style:italic;font-size:2.6cqh;color:var(--ink-soft)}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -135,6 +141,7 @@
   </section>
 
   <div id="count"><div class="paper" id="countN">3</div></div>
+  <div id="inter"><div class="paper"><div class="n" id="interN"></div><div class="t" id="interT"></div><div class="w" id="interW"></div></div></div>
   <div id="paused"><div class="paper">Paused. Press space to continue.</div></div>
 
   <section class="spread" id="results" aria-label="Results">
@@ -158,7 +165,8 @@
 const CHAPTERS = [
   {set:"1994", num:"I",   name:"The Great Dollar Rush", when:"1994", ready:true},
   {set:"2000", num:"II",  name:"The Overnight Panic", when:"November 2000", ready:true},
-  {set:"2001", num:"III", name:"The Flying Booklet", when:"February 2001", ready:false},
+  {set:"2001", num:"III", name:"The Flying Booklet", when:"February 2001", ready:true},
+  {set:"son",  num:"",    name:"The End", when:"Özal's dance and the credits", ready:true},
 ];
 const P = new URLSearchParams(location.search);
 let SET = P.get("set") || "1994";
@@ -336,7 +344,11 @@ async function end(){
   tally();
   const i = CHAPTERS.findIndex(c => c.set === SET), nx = CHAPTERS.slice(i+1).find(c => c.ready);
   if (nx){                // puan tablosu yok: doğrudan sıradaki bölüm
-    G.state = "next"; SET = nx.set; await load();
+    G.state = "next"; V.pause(); $("hud").classList.remove("on");
+    $("interN").textContent = nx.num ? "Chapter " + nx.num : "Epilogue"; $("interT").textContent = nx.name; $("interW").textContent = nx.when;
+    $("inter").classList.add("on");
+    SET = nx.set; await Promise.all([load(), new Promise(r => setTimeout(r, 3500))]);
+    $("inter").classList.remove("on");
     if (D && G){
       D.moves.forEach(m => { m.done=false; m.scores=[]; m.rating=null; });
       G.ev = 0; G.noteUntil = 0; $("note").classList.remove("on"); $("lyric").textContent = "";
@@ -355,7 +367,7 @@ function showResults(){
     + `<div><span>Longest streak</span><span></span><span>${G.maxCombo}</span></div>`;
   $("results").classList.add("on"); $("againBtn").focus();
 }
-function backToMenu(){ V.pause(); G = null; $("hud").classList.remove("on"); $("story").classList.remove("on"); $("results").classList.remove("on"); $("paused").classList.remove("on"); $("menu").classList.add("on"); }
+function backToMenu(){ V.pause(); G = null; $("inter").classList.remove("on"); $("hud").classList.remove("on"); $("story").classList.remove("on"); $("results").classList.remove("on"); $("paused").classList.remove("on"); $("menu").classList.add("on"); }
 V.addEventListener("ended", () => { if (G && G.state === "play") end(); });
 $("camBtn").onclick = startCamera;
 $("startBtn").onclick = () => start(false);
@@ -422,9 +434,9 @@ function loop(){
   detect();
   const now = performance.now(), t = V.currentTime || 0;
   if (G && D && (G.state === "play" || G.state === "count")){
-    const dance = inDance(t);
+    const hasMoves = D.moves.length > 0, dance = hasMoves && inDance(t);
     $("hud").classList.toggle("on", dance);
-    $("story").classList.toggle("on", !dance && G.state === "play");
+    $("story").classList.toggle("on", hasMoves && !dance && G.state === "play");
     if (G.state === "play"){
       fireEvents(t);
       const ref = refAngles(Math.max(0, t - .25));
@@ -451,7 +463,7 @@ addEventListener("resize", resize);
 
 /* ============ İÇİNDEKİLER + YÜKLEME ============ */
 function renderChapters(){
-  $("chapters").innerHTML = CHAPTERS.map(c => `<li class="${c.set===SET?"cur":""}"><span class="num">${c.num}</span>`
+  $("chapters").innerHTML = CHAPTERS.map(c => `<li class="${c.set===SET?"cur":""}"><span class="num">${c.num || "&nbsp;"}</span>`
     + (c.ready ? `<button data-set="${c.set}">${c.name}</button>` : `<span class="off">${c.name}</span>`)
     + `<span class="lead"></span><span class="when">${c.ready ? c.when : "still being written"}</span></li>`).join("");
   $("chapters").querySelectorAll("button").forEach(b => b.onclick = () => { if (b.dataset.set !== SET){ SET = b.dataset.set; load(); } });
